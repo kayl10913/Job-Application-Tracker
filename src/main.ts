@@ -480,7 +480,7 @@ function render(): void {
           </div>
         </div>
         <div class="toolbar">
-          <span class="db-pill ${state.connected ? 'ok' : 'bad'}">${state.connected ? 'MongoDB connected' : 'MongoDB offline'}</span>
+          <span class="db-pill ${state.connected ? 'ok' : 'bad'}" title="${state.connected ? 'Connected' : escapeHtml(state.error || 'MongoDB offline')}">${state.connected ? 'MongoDB connected' : 'MongoDB offline'}</span>
           ${state.user ? `<span class="db-pill">${escapeHtml(state.user)}</span>` : ''}
           <button class="btn ghost" type="button" id="logout">Log out</button>
           <button class="btn ghost" type="button" id="export-jobs">Export</button>
@@ -660,8 +660,12 @@ async function signIn(email: string, password: string): Promise<void> {
     render()
     await loadTracker()
   } catch (error) {
-    state.user = null
-    state.loginError = messageOf(error)
+    if (state.user) {
+      state.connected = false
+      state.error = messageOf(error)
+    } else {
+      state.loginError = messageOf(error)
+    }
   } finally {
     state.loading = false
     render()

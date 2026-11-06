@@ -1,12 +1,15 @@
 import { config as loadEnv } from 'dotenv'
 import express from 'express'
 import { existsSync } from 'node:fs'
-import { MongoClient, ObjectId, type Collection, type WithId } from 'mongodb'
+import { ObjectId, type WithId } from 'mongodb'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { authConfigured, clearSession, loginAllowed, readSession, requireAuth, setSession } from './auth.ts'
+import { explainMongoError, getCollection, mongoDbName } from './mongo.ts'
 
-loadEnv({ path: resolve(dirname(fileURLToPath(import.meta.url)), '../.env') })
+if (!process.env.VERCEL) {
+  loadEnv({ path: resolve(dirname(fileURLToPath(import.meta.url)), '../.env') })
+}
 
 const STATUSES = ['Saved', 'Applied', 'Screening', 'Interview', 'Offer', 'Rejected', 'Withdrawn'] as const
 const WORK_MODES = ['On-site', 'Hybrid', 'Remote'] as const
@@ -32,10 +35,7 @@ type JobDoc = {
 
 type Job = JobDoc & { id: string }
 
-const uri = process.env.MONGODB_URI?.trim()
-const dbName = process.env.MONGODB_DB?.trim() || 'job-ledger'
-
-let client: MongoClient | null = null
+const dbName = mongoDbName()
 
 function isStatus(value: unknown): value is Status {
   return typeof value === 'string' && (STATUSES as readonly string[]).includes(value)
@@ -103,19 +103,19 @@ function fromBody(body: unknown, fallback?: Partial<JobDoc>): JobDoc {
   }
 }
 
-async function jobs(): Promise<Collection<JobDoc>> {
-  if (!uri) {
-    throw new Error('MONGODB_URI is missing. Add it to your environment variables.')
-  }
-  if (!client) {
-    client = new MongoClient(uri)
-    await client.connect()
-  }
-  return client.db(dbName).collection<JobDoc>('applications')
+async function jobs() {
+  return getCollection<JobDoc>('applications')
 }
 
 export const app = express()
 app.set('trust proxy', 1)
+app.use((req, _res, next) => {
+  const original = req.originalUrl || req.url
+  if (original.startsWith('/api')) {
+    req.url = original.split('?')[0]
+  }
+  next()
+})
 app.use(express.json({ limit: '2mb' }))
 
 app.get('/api/health', async (_req, res) => {
@@ -124,7 +124,7 @@ app.get('/api/health', async (_req, res) => {
     await collection.estimatedDocumentCount()
     res.json({ ok: true, db: dbName })
   } catch (error) {
-    res.status(503).json({ ok: false, error: error instanceof Error ? error.message : 'Database unavailable' })
+    res.status(503).json({ ok: false, error: explainMongoError(error) })
   }
 })
 
@@ -187,7 +187,7 @@ app.post('/api/jobs/import', async (req, res) => {
     }
     res.json(saved)
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to import applications'
+    const message = explainMongoError(error)
     res.status(500).json({ error: message })
   }
 })
@@ -198,7 +198,7 @@ app.get('/api/jobs', async (_req, res) => {
     const docs = await collection.find().sort({ updatedAt: -1 }).toArray()
     res.json(docs.map(toJob))
   } catch (error) {
-    res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load applications' })
+    res.status(500).json({ error: explainMongoError(error) })
   }
 })
 
@@ -209,7 +209,7 @@ app.post('/api/jobs', async (req, res) => {
     const result = await collection.insertOne(doc)
     res.status(201).json(toJob({ _id: result.insertedId, ...doc }))
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to create application'
+    const message = explainMongoError(error)
     res.status(message.includes('required') ? 400 : 500).json({ error: message })
   }
 })
@@ -231,7 +231,7 @@ app.put('/api/jobs/:id', async (req, res) => {
     await collection.replaceOne({ _id: id }, doc)
     res.json(toJob({ _id: id, ...doc }))
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to update application'
+    const message = explainMongoError(error)
     res.status(message.includes('required') ? 400 : 500).json({ error: message })
   }
 })
@@ -261,7 +261,7 @@ app.patch('/api/jobs/:id', async (req, res) => {
     }
     res.json(toJob(result))
   } catch (error) {
-    res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to update status' })
+    res.status(500).json({ error: explainMongoError(error) })
   }
 })
 
@@ -280,7 +280,7 @@ app.delete('/api/jobs/:id', async (req, res) => {
     }
     res.status(204).send()
   } catch (error) {
-    res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to delete application' })
+    res.status(500).json({ error: explainMongoError(error) })
   }
 })
 
