@@ -1,0 +1,29 @@
+{
+  "name": "job-application-tracker",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "main": "electron/main.mjs",
+  "productName": "Job Application Tracker",
+  "scripts": {
+    "dev": "concurrently -k \"npm run server\" \"vite\"",
+    "server": "tsx watch --include .env server/index.ts",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "app": "npm run build && electron ."
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.6",
+    "electron": "^45.2.3",
+    "typescript": "~7.0.2",
+    "vite": "^8.3.6"
+  },
+  "dependencies": {
+    "concurrently": "^10.0.6",
+    "dotenv": "^18.0.9",
+    "express": "^5.3.0",
+    "mongodb": "^7.8.0",
+    "tsx": "^4.23.15"
+  }
+}
