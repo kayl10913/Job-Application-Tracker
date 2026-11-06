@@ -28,8 +28,8 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T
 }
 
-export function fetchMe(): Promise<{ email: string }> {
-  return request<{ email: string }>('/api/me')
+export function fetchMe(): Promise<{ email: string | null }> {
+  return request<{ email: string | null }>('/api/me')
 }
 
 export function login(email: string, password: string): Promise<{ email: string }> {

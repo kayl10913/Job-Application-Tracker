@@ -690,6 +690,10 @@ async function boot(): Promise<void> {
   render()
   try {
     const me = await fetchMe()
+    if (!me.email) {
+      state.user = null
+      return
+    }
     state.user = me.email
     await loadTracker()
   } catch (error) {

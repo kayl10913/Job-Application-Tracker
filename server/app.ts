@@ -154,11 +154,7 @@ app.post('/api/logout', (_req, res) => {
 
 app.get('/api/me', (req, res) => {
   const session = readSession(req)
-  if (!session) {
-    res.status(401).json({ error: 'Please sign in.' })
-    return
-  }
-  res.json({ email: session.email })
+  res.json({ email: session?.email ?? null })
 })
 
 app.use('/api/jobs', requireAuth)

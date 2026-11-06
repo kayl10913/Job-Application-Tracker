@@ -72,12 +72,12 @@ function cookieOptions(): string {
 }
 
 export function setSession(res: Response, email: string): void {
-  res.append('Set-Cookie', `${COOKIE}=${sign(email)}; ${cookieOptions()}`)
+  res.setHeader('Set-Cookie', `${COOKIE}=${encodeURIComponent(sign(email))}; ${cookieOptions()}`)
 }
 
 export function clearSession(res: Response): void {
   const secure = process.env.VERCEL === '1' ? '; Secure' : ''
-  res.append('Set-Cookie', `${COOKIE}=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax${secure}`)
+  res.setHeader('Set-Cookie', `${COOKIE}=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax${secure}`)
 }
 
 export function readSession(req: Request): { email: string } | null {
